@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Finding Sources</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+        }
+        .instructions {
+            width: 80%;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0px 0px 10px 0px rgba(0,0,0,0.1);
+        }
+        form {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+        }
+        .questions {
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0px 0px 10px 0px rgba(0,0,0,0.1);
+        }
+        a {
+            color: #337ab7;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #23527c;
+            text-decoration: underline;
+        }
+        a:visited {
+            color: #6130a3;
+        }
+        input[type="radio"] {
+            margin: 10px 5px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        input[type="text"] {
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        input[type="date"] {
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        input[type="submit"] {
+            background-color: #337ab7;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            float: right;
+            margin: 0 0 20px 0;
+        }
+        input[type="submit"]:hover {
+            background-color: #23527c;
+        }
+
+        #timer {
+            margin: 15px;
+            position: fixed;
+            top: 0;
+            right: 0;
+            background-color: #ffe6e6;
+            padding: 10px;
+            font-size: large;
+            /* font-weight: bold; */
+            border: 3px solid black;
+            border-radius: 5px;
+            width: 350px;
+        }
+
+        .question {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .highlight {
+            background-color: #f88;
+        }
+
+        #valid_triple {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: green;
+        }
+
+        #invalid_triple {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: red;
+        }
+
+        #requirements li {
+            /* font-size: 1.2em; */
+            font-weight: bold;
+        }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        $(document).ready(function(){
+            // display timer
+            var time_left = {{ time_left }};
+
+            var currentTripleIndex = 0;
+            // console.log(data);
+            var data = {{ data|tojson }};
+            var username = "{{ username }}";
+            makeQuestions(data, username);
+
+            var timer = setInterval(function() {
+                // Calculating the days, hours, minutes and seconds left
+                var minutes = Math.floor(time_left / 60);
+                var seconds = Math.floor(time_left % 60);
+
+                // Result is output to the specific element
+                var timeToDisplay = minutes + "m " + seconds + "s ";
+                document.getElementById("timer_value").innerHTML = timeToDisplay;
+
+                time_left--;
+                if (time_left <= 0) {
+                    clearInterval(timer);
+                    document.getElementById("timer_value").innerHTML = "You have run out of time. Please finish the final question and submit your responses.";
+                } else {
+                    document.getElementById("timer_value").innerHTML = timeToDisplay;
+                }
+                document.title = `Finding Sources (${time_left}s left)`;
+            }, 1000);
+
+            $("form").submit(function(e){
+                var isFormValid = true;
+
+                $(".question").each(function() {
+                    var $this = $(this);
+                    $this.removeClass("highlight"); // remove the highlight class in case it was added in a previous submission attempt
+                    if ($this.find("input[type='radio']:checked").length == 0) {
+                        alert("Please select an option for all questions.");
+                        $this.addClass("highlight"); // add the highlight class
+                        // scroll to the question
+                        $('html, body').animate({
+                            scrollTop: $this.offset().top
+                        }, 500);
+                        isFormValid = false;
+                        return false;
+                    }
+
+                    var selectedRadioValue = $this.find("input[type='radio']:checked").val();
+                    if (selectedRadioValue == "source_alt" && ($this.find(`#${selectedRadioValue} #link`).val().trim() == "" || $this.find(`#${selectedRadioValue} #span`).val().trim() == "" || $this.find(`#${selectedRadioValue} #date`).val().trim() == "")) {
+                        // if source_alt, link, span, and date must be filled in
+                        alert("Please fill in all fields.");
+                        $this.addClass("highlight"); // add the highlight class
+                        // scroll to the question
+                        $('html, body').animate({
+                            scrollTop: $this.offset().top
+                        }, 500);
+                        isFormValid = false;
+                        return false;
+                    } else if (selectedRadioValue != "source_cannot_find" && ($this.find(`#${selectedRadioValue} #span`).val().trim() == "")) {
+                        // if one of listed sources, span must be filled in
+                        alert("Please fill in all fields."); 
+                        $this.addClass("highlight"); // add the highlight class
+                        // scroll to the question
+                        $('html, body').animate({
+                            scrollTop: $this.offset().top
+                        }, 500);
+                        isFormValid = false;
+                        return false;
+                    }
+
+                    // checkboxes all checked off
+                    if ((selectedRadioValue != "source_cannot_find") && ($this.find(`#${selectedRadioValue} input[type='checkbox']:checked`).length != 5)) {
+                        alert("Please check off all checkboxes under \"requirements\".");
+                        $this.addClass("highlight"); // add the highlight class
+                        // scroll to the question
+                        $('html, body').animate({
+                            scrollTop: $this.offset().top
+                        }, 500);
+                        isFormValid = false;
+                        return false;
+                    }
+                });
+
+                if (!isFormValid) {
+                    e.preventDefault();
+                } else {
+                    e.preventDefault();
+
+                    var formData = {
+                        username: username,
+                        responses: []
+                    };
+
+                    $(".question").each(function() {
+                        var $this = $(this);
+                        var selectedRadioValue = $this.find("input[type='radio']:checked").val();
+                        var response = {
+                            questionId: $this.attr('id'),
+                            selectedOption: selectedRadioValue,
+                        };
+                        if (selectedRadioValue == "source_cannot_find") {
+                            response.notes = $this.find(`#${selectedRadioValue} textarea`).val().trim();
+                        } else {
+                            response.span = $this.find(`#${selectedRadioValue} textarea`).val().trim();
+                            if (selectedRadioValue == "source_alt") {
+                                response.link = $this.find(`#${selectedRadioValue} #link`).val().trim();
+                                response.date = $this.find(`#${selectedRadioValue} #date`).val().trim();
+                            }
+                        }
+                        formData.responses.push(response);
+                    });
+
+                    $.ajax({
+                        type: "POST",
+                        url: "/next_question",
+                        data: JSON.stringify(formData),
+                        contentType: "application/json",
+                        dataType: "json",
+                        success: function(response) {
+                            // load new data
+                            if (response.redirect) {
+                                window.location.href = response.redirect;
+                            } else {
+                                makeQuestions(response.data, username);
+                            }
+                        },
+                        error: function(jqXHR, textStatus, errorThrown) {
+                            console.log('jqXHR:', jqXHR);
+                            console.log('textStatus:', textStatus);
+                            console.log('errorThrown:', errorThrown);
+                            console.log('formData', formData);
+                            console.log('formData', JSON.stringify(formData));
+                            alert("Error submitting form: " + textStatus + " - " + errorThrown);
+                        }
+                    });
+                }
+            });
+        });
+
+        function makeQuestions(data, username) {
+            // remove current child
+            $(".questions").empty();
+            for (let currentTripleIndex = 0; currentTripleIndex < data.length; currentTripleIndex++) {
+                var triple = data[currentTripleIndex];
+                var nextTriple = data[currentTripleIndex]["next_triple"];
+                var question = document.createElement("div");
+                question.setAttribute("id", `question_${currentTripleIndex}`);
+                question.setAttribute("class", "question");
+
+                var fact_template = "";
+
+                if (triple["triple"][1] == "member of sports team") {
+                    fact_template = `{subject} is a member of the {object} sports team`;
+                } else if (triple["triple"][1] == "member of political party") {
+                    fact_template = `{subject} is a member of the {object} political party`;
+                } else if (triple["triple"][1] == "position held") {
+                    fact_template = `{subject} is {object}`;
+                } else {
+                    fact_template = `{subject}'s {relation} is {object}`;
+                }
+                fact_nl = fact_template.replace("{subject}", triple["triple"][0]).replace("{relation}", triple["triple"][1]).replace("{object}", triple["triple"][2]);
+                if ((triple["startDate"] != null) && (triple["startDate"].split("/")[0] == "01")) {
+                    triple["startDate"] = triple["startDate"].split("/")[1];
+                }
+                if ((triple["endDate"] != null) && (triple["endDate"].split("/")[0] == "01")) {
+                    triple["endDate"] = triple["endDate"].split("/")[1];
+                }
+                if (triple["startDate"] == null) {
+                    fact_nl = fact_nl + ` (was True until ${triple["endDate"]})`
+                } else if (triple["endDate"] == null) {
+                    fact_nl = fact_nl + ` (is True starting ${triple["startDate"]})`
+                } else if (triple["startDate"] == triple["endDate"]) {
+                    fact_nl = fact_nl + ` (was True in ${triple["startDate"].split("/")[1]})`
+                } else {
+                    fact_nl = fact_nl + ` (was True from ${triple["startDate"]} to ${triple["endDate"]})`
+                }
+                next_fact_nl = nextTriple == null ? "" : fact_template.replace("{subject}", nextTriple[0]).replace("{relation}", nextTriple[1]).replace("{object}", nextTriple[2]);
+                if (nextTriple == null) {
+                    next_triple_fact = ""
+                } else {
+                    next_triple_fact = `Additionally, the article should <b>not</b> imply the below fact:</p>
+                    <p id="invalid_triple">${ next_fact_nl }</p>`;
+                }
+                question.innerHTML = `<p>Choose one of the following articles that imply that the following fact is <b>true at the time that the article was written</b>. (This means the article should be written between the start and end dates of the fact being true.)</p>
+                <p id="valid_triple">${ fact_nl }</p> ${next_triple_fact}
+                If multiple articles satisfy these requirements, you may choose any of them. You do not need to validate every article.
+                If no articles satisfy these requirements, you have the option to either find a news article that satisfies the requirements (a google search link is provided for reference), or selecting "cannot find source" if you cannot easily find a source.</p>
+                <p>You may use "ctrl-f" (find tool) to quickly validate whether or not a fact is in the article.</p>`;
+                for (let currentSourceIndex = 0; currentSourceIndex < triple["sources"].length; currentSourceIndex++) {
+                    var sourceLabel = document.createElement("label");
+                    sourceLabel.innerHTML = `<input type="radio" name="fact_${currentTripleIndex}" value="source_${currentSourceIndex}">
+                    <a id="source" href="${ triple["sources"][currentSourceIndex]["link"] }" target="_blank">
+                        ${ triple["sources"][currentSourceIndex]["title"] }
+                    </a>  (${ triple["sources"][currentSourceIndex]["date"] }) <br />`;
+                    question.appendChild(sourceLabel);
+
+                    var sourceDiv = document.createElement("div");
+                    sourceDiv.setAttribute("id", `source_${currentSourceIndex}`);
+                    sourceDiv.style.display = "none";
+                    // <div id="date-instructions">Copy the date the article was written:</div>
+                    // <input type="date" id="date">
+                    sourceDiv.innerHTML = `
+                    <div id="checklist">Check off the following requirements for the source. (Make sure to actually click the checkboxes):</div>
+                    <label><input type="checkbox" id="check1" name="check1" value="check1">
+                    The article is a news article or blog post</label><br>
+                    <label><input type="checkbox" id="check2" name="check2" value="check2">
+                    The fact is stated in the <emph>main body</emph> of the article text, not in a table, list, image, image caption, embedded tweet, etc.</label><br>
+                    <label><input type="checkbox" id="check3" name="check3" value="check3">
+                    The article is a web page, not a PDF or other file format.</label><br>
+                    <label><input type="checkbox" id="check4" name="check4" value="check4">
+                    The article is written in English.</label><br>
+                    <label><input type="checkbox" id="check5" name="check5" value="check5">
+                    The articles does not state that the fact is or is about to become false.</label><br>
+                    <br>
+                    <div id="span-instructions">Copy and paste the portion of the article that supports the <b><span style="color: green;">green</span></b> fact. (This can be a sentence or a few sentences long.):</div>
+                    <textarea id="span"></textarea>`;
+                    question.appendChild(sourceDiv);
+                }
+                var altSourceLabel = document.createElement("label");
+                altSourceLabel.innerHTML = `<input type="radio" name="fact_${currentTripleIndex}" value="source_alt"> Find alternative source from <a id="source" href="${ triple["google_link"] }" target="_blank">[this Google link]</a>.<br> (Link provided only as reference -- you may find a better source for the fact by modifying the search query or date range.)<br />`;
+                question.appendChild(altSourceLabel);
+
+                var altSourceDiv = document.createElement("div");
+                altSourceDiv.setAttribute("id", "source_alt");
+                altSourceDiv.style.display = "none";
+                altSourceDiv.innerHTML = `
+                    <div id="link-instructions">Copy and paste a link to an article that implies this fact is <b>true</b>:</div>
+                    <input type="text" id="link"></input>
+                    <div id="date-instructions">Copy the date the article was written:</div>
+                    <input type="date" id="date">
+                    <div id="checklist">Check off the following requirements for the source. (Make sure to actually click the checkboxes):</div>
+                    <label><input type="checkbox" id="check1" name="check1" value="check1">
+                    The article is a news article or blog post</label><br>
+                    <label><input type="checkbox" id="check2" name="check2" value="check2">
+                    The fact is stated in the <emph>main body</emph> of the article text, not in a table, list, image, image caption, embedded tweet, etc.</label><br>
+                    <label><input type="checkbox" id="check3" name="check3" value="check3">
+                    The article is a web page, not a PDF or other file format.</label><br>
+                    <label><input type="checkbox" id="check4" name="check4" value="check4">
+                    The article is written in English.</label><br>
+                    <label><input type="checkbox" id="check5" name="check5" value="check5">
+                    The articles does not state that the fact is or is about to become false.</label><br>
+                    <br>
+                    <div id="span-instructions">Copy and paste the portion of the article that supports the <b>green</b> fact. (This can be a sentence or a few sentences long.):</div>
+                    <textarea id="span"></textarea>`;
+                question.appendChild(altSourceDiv);
+
+                var cannotFindLabel = document.createElement("label");
+                cannotFindLabel.innerHTML = `
+                    <input type="radio" name="fact_${currentTripleIndex}" value="source_cannot_find"> Cannot find source<br />`;
+                question.appendChild(cannotFindLabel);
+
+                var cannotFindDiv = document.createElement("div");
+                cannotFindDiv.setAttribute("id", "source_cannot_find");
+                cannotFindDiv.style.display = "none";
+                cannotFindDiv.innerHTML = `
+                    <div id="notes-instructions"><b>[Optional:]</b> Why were you unable to find a source? (e.g. no articles that clearly imply the fact, no news articles, no English articles, all articles are about fact becoming false, no articles that state fact in its main body etc.)</div>
+                    <textarea id="notes"></textarea>`;
+                question.appendChild(cannotFindDiv);
+
+                $(".questions").append(question);
+            }
+
+            $("input[type='radio']").click(function(){
+                var radioValue = $(this).val();
+                var parentQuestion = $(this).closest('.question');
+                $(`#${radioValue}`, parentQuestion).show().find('textarea').focus();
+                $("div[id^='source_']:not(#"+radioValue+")", parentQuestion).hide();
+            });
+        }
+    </script>
+</head>
+<body>
+    <body>
+        <div class="instructions">
+            <h2>Instructions</h2>
+            <p>For each question, you will be presented a fact. Please find a news article that implies that the fact is true, according to the below requirements:</p>
+            <ol id="requirements">
+                <li>The article implies the fact, such that a reasonable person, without any prior knowledge, can infer that the fact is true from reading the article.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;">Emad Mostaque is CEO of Stability AI (was True from 2020 to 2024-03-23)</span></p>
+                <table style="width:100%">
+                  <tr>
+                    <th style="width:50%">✔️ Good Sources</th>
+                    <th style="width:50%">❌ Bad Sources</th>
+                  </tr>
+                  <tr>
+                    <td><a href="https://techcrunch.com/2022/08/12/a-startup-wants-to-democratize-the-tech-behind-dall-e-2-consequences-be-damned/?guccounter=1/" target="_blank">This startup is setting a DALL-E 2-like AI free, consequences be damned</a>: Article says <emph>"...Stability AI CEO and founder Emad Mostaque wrote in a blog post"</emph></td>
+                    <td><a href="https://www.technologyreview.com/2022/12/16/1065247/artists-can-now-opt-out-of-the-next-version-of-stable-diffusion/" target="_blank">Artists can now opt out of the next version of Stable Diffusion</a>: Cannot conclude fact from text of article</td>
+                  </tr>
+                </table>
+                </div>
+                <li>The article is a news article or blog post.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;">Taylor Aylmer is a member of the Racing Louisville FC sports tea</span></p>
+                <table style="width:100%">
+                    <tr>
+                    <th style="width:50%">✔️ Good Sources</th>
+                    <th style="width:50%">❌ Bad Sources</th>
+                    </tr>
+                    <tr>
+                      <td><a href="https://www.racingloufc.com/news/2023/10/06/team-news-taylor-aylmer-to-make-first-regular-season-start/" target="_blank">Team News: Aylmer to make first regular season start</a></td>
+                      <td><a href="https://www.espn.com/soccer/player/_/id/248457/taylor-aylmer" target="_blank">Taylor Aylmer - Racing Louisville FC Midfielder - ESPN</a></td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td><a href="https://www.instagram.com/tayloraylmer/" target="_blank">Taylor Aylmer - Instagram</a></td>
+                    </tr>
+                </table>
+                </div>
+                <li>The fact is stated in the <emph>main body</emph> of the article text, not in a table, list, image, image caption, embedded tweet, etc.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;">Taylor Aylmer is a member of the Racing Louisville FC sports team</span></p>
+                <table style="width:100%">
+                  <tr>
+                    <th style="width:50%">✔️ Good Sources</th>
+                    <th style="width:50%">❌ Bad Sources</th>
+                  </tr>
+                  <tr>
+                    <td><a href="https://www.racingloufc.com/news/2023/10/06/team-news-taylor-aylmer-to-make-first-regular-season-start/" target="_blank">Team News: Aylmer to make first regular season start</a></td>
+                    <td><a href="https://www.racingloufc.com/news/2023/10/06/recap-racing-rallies-to-beat-orlando-keep-playoff-hopes-alive/" target="_blank">Recap: Racing rallies to beat Orlando, keep playoff hopes alive</a>: Fact is in a list at the end, not the main text</td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td><a href="https://www.courier-journal.com/story/sports/2023/10/19/racing-louisville-fc-midfielder-jaelin-howell-national-womens-soccer-league/71154713007/" target="_blank">Jaelin Howell, Racing Louisville bring community together to help people with Down syndrome</a>: Fact is in an image caption but nowhere in the main text</td>
+                  </tr>
+                </table>
+                </div>
+                <li>The article is a web page, not a PDF or other file format.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;">Ali Shojaie is a IMS Fellow</span></p>
+                <table style="width:100%">
+                  <tr>
+                    <th style="width:50%">✔️ Good Source</th>
+                    <th style="width:50%">❌ Bad Source</th>
+                  </tr>
+                  <tr>
+                    <td><a href="https://sph.washington.edu/news-events/sph-blog/Ali-Shojaie-elected-fellow-Institute-of-Mathematical-Statistics" target="_blank">Ali Shojaie elected fellow of the Institute of Mathematical Statistics</a></td>
+                    <td><a href="https://imstat.org/wp-content/uploads/2023/04/Bulletin52_4.pdf" target="_blank">IMS Carver Award 2023</a>: Source is a PDF file, not a web page</td>
+                  </tr>
+                </table>
+                </div>
+                <li>The article is written in English.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;"> Emad Mostaque is CEO of Stability AI (was True from 2020 to 2024-03-23)</span></p>
+                <table style="width:100%">
+                    <tr>
+                    <th style="width:50%">✔️ Good Source</th>
+                    <th style="width:50%">❌ Bad Source</th>
+                    </tr>
+                    <tr>
+                    <td><a href="https://techcrunch.com/2022/08/12/a-startup-wants-to-democratize-the-tech-behind-dall-e-2-consequences-be-damned/?guccounter=1/" target="_blank">This startup is setting a DALL-E 2-like AI free, consequences be damned</a></td>
+                    <td><a href="https://protidinerbangladesh.com/technology/33844/%E0%A6%8F%E0%A6%86%E0%A6%87%E0%A7%9F%E0%A7%87%E0%A6%B0-%E0%A6%95%E0%A6%BE%E0%A6%B0%E0%A7%8D%E0%A6%AF%E0%A6%95%E0%A7%8D%E0%A6%B0%E0%A6%AE-%E0%A6%B8%E0%A7%8D%E0%A6%A5%E0%A6%97%E0%A6%BF%E0%A6%A4-%E0%A6%B0%E0%A6%BE%E0%A6%96%E0%A6%A4%E0%A7%87-%E0%A6%B6%E0%A7%80%E0%A6%B0%E0%A7%8D%E0%A6%B7-%E0%A6%AC%E0%A6%BF%E0%A6%B6%E0%A7%87%E0%A6%B7%E0%A6%9C%E0%A7%8D%E0%A6%9E%E0%A6%A6%E0%A7%87%E0%A6%B0-%E0%A6%85%E0%A6%A8%E0%A7%81%E0%A6%B0%E0%A7%8B%E0%A6%A7" target="_blank">এআইয়ের কার্যক্রম স্থগিত রাখতে শীর্ষ বিশেষজ্ঞদের অনুরোধ</a>: Article is not in English</td>
+                    </tr>
+                </table>
+                </div>
+                <!-- <li>The article implies that the fact is true <emph>at the time that the article was written</emph>.
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;"> Emad Mostaque is CEO of Stability AI (was True from 2020 to 2024-03-23)</span></p>
+                <table style="width:100%">
+                    <tr>
+                    <th style="width:50%">✔️ Good Source</th>
+                    <th style="width:50%">❌ Bad Source</th>
+                    </tr>
+                    <tr>
+                    <td><a href="https://techcrunch.com/2022/08/12/a-startup-wants-to-democratize-the-tech-behind-dall-e-2-consequences-be-damned/?guccounter=1/" target="_blank">This startup is setting a DALL-E 2-like AI free, consequences be damned</a></td>
+                    <td><a href="https://protidinerbangladesh.com/technology/33844/%E0%A6%8F%E0%A6%86%E0%A6%87%E0%A7%9F%E0%A7%87%E0%A6%B0-%E0%A6%95%E0%A6%BE%E0%A6%B0%E0%A7%8D%E0%A6%AF%E0%A6%95%E0%A7%8D%E0%A6%B0%E0%A6%AE-%E0%A6%B8%E0%A7%8D%E0%A6%A5%E0%A6%97%E0%A6%BF%E0%A6%A4-%E0%A6%B0%E0%A6%BE%E0%A6%96%E0%A6%A4%E0%A7%87-%E0%A6%B6%E0%A7%80%E0%A6%B0%E0%A7%8D%E0%A6%B7-%E0%A6%AC%E0%A6%BF%E0%A6%B6%E0%A7%87%E0%A6%B7%E0%A6%9C%E0%A7%8D%E0%A6%9E%E0%A6%A6%E0%A7%87%E0%A6%B0-%E0%A6%85%E0%A6%A8%E0%A7%81%E0%A6%B0%E0%A7%8B%E0%A6%A7" target="_blank">এআইয়ের কার্যক্রম স্থগিত রাখতে শীর্ষ বিশেষজ্ঞদের অনুরোধ</a>: Article is not in English</td>
+                    </tr>
+                </table>
+                </div>
+                </li> -->
+                <li>Avoid articles that state that the fact is or is about to become false. These are generally written near or past the end date of a fact being true.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;">Emad Mostaque is CEO of Stability AI (was True from 2020 to 2024-03-23)</span></p>
+                <table style="width:100%">
+                    <tr>
+                    <th style="width:50%">✔️ Good Source</th>
+                    <th style="width:50%">❌ Bad Source</th>
+                    </tr>
+                    <tr>
+                    <td><a href="https://techcrunch.com/2022/08/12/a-startup-wants-to-democratize-the-tech-behind-dall-e-2-consequences-be-damned/?guccounter=1/" target="_blank">This startup is setting a DALL-E 2-like AI free, consequences be damned</a></td>
+                    <td><a href="https://www.forbes.com/sites/kenrickcai/2024/03/22/stability-ai-founder-emad-mostaque-plans-to-resign-as-ceo-sources-say/?sh=7cd4ad4b5239" target="_blank">Stability AI founder Emad Mostaque plans to resign as CEO, sources say</a>: Article is about the fact being about to be false</td>
+                    </tr>
+                </table>
+                </div>
+            </ol>
+            <p>If no listed articles satisfy these requirements, you have the option to either find a news article that satisfies the requirements (a google search link is provided for reference, you may need to manually adjust the query or date parameters) or selecting "cannot find source" if you cannot find any source in a reasonable amount of time.</p>
+            <p>There may also be a second fact that you need to avoid. If you see this fact in the article, do not select it as a source.</p>
+            <!-- <p><b>Note:</b> the dates around the fact may be approximate. Use them as a rough guideline to find articles written generally between the start and end dates. (The start and end years are accurate, but the months and days may be approximate.)</p> -->
+            <p><b>Tip:</b> You may use "ctrl-f" (find tool) to quickly validate whether or not a fact is in the article.</p>
+        </div>
+        <div id="timer">
+            <b>Timer:</b> <span id="timer_value"></span>
+        </div>
+        <form method="POST">
+            <div class="questions">
+            </div>
+            <input type="submit" value="Next Question">
+        </form>
+    </body>
+</body>
+</html>

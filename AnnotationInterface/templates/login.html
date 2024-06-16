@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+        }
+        .instructions {
+            width: 80%;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0px 0px 10px 0px rgba(0,0,0,0.1);
+        }
+        form {
+            width: 80%;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0px 0px 10px 0px rgba(0,0,0,0.1);
+        }
+        input[type="submit"] {
+            background-color: #337ab7;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            float: center;
+            margin: 5px 0;
+        }
+        input[type="submit"]:hover {
+            background-color: #23527c;
+        }
+    </style>
+</head>
+<body>
+    <form method="POST">
+        <div class="instructions">
+            <h2>Instructions</h2>
+            <p><b>Please read these instructions carefully and only proceed once you have understood them. Once you start the task, you will have 10 minutes to get through as many questions as possible.</b></p>
+            <p>For each question, you will be presented a fact. Please find a news article that implies that the fact is true, according to the below requirements:</p>
+            <ol id="requirements">
+                <li>The article implies the fact, such that a reasonable person, without any prior knowledge, can infer that the fact is true from reading the article.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;">Emad Mostaque is CEO of Stability AI (was True from 2020 to 2024-03-23)</span></p>
+                <table style="width:100%">
+                  <tr>
+                    <th style="width:50%">✔️ Good Sources</th>
+                    <th style="width:50%">❌ Bad Sources</th>
+                  </tr>
+                  <tr>
+                    <td><a href="https://techcrunch.com/2022/08/12/a-startup-wants-to-democratize-the-tech-behind-dall-e-2-consequences-be-damned/?guccounter=1/" target="_blank">This startup is setting a DALL-E 2-like AI free, consequences be damned</a>: Article says <emph>"...Stability AI CEO and founder Emad Mostaque wrote in a blog post"</emph></td>
+                    <td><a href="https://www.technologyreview.com/2022/12/16/1065247/artists-can-now-opt-out-of-the-next-version-of-stable-diffusion/" target="_blank">Artists can now opt out of the next version of Stable Diffusion</a>: Cannot conclude fact from text of article</td>
+                  </tr>
+                </table>
+                </div>
+                <li>The article is a news article or blog post.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;">Taylor Aylmer is a member of the Racing Louisville FC sports tea</span></p>
+                <table style="width:100%">
+                    <tr>
+                    <th style="width:50%">✔️ Good Sources</th>
+                    <th style="width:50%">❌ Bad Sources</th>
+                    </tr>
+                    <tr>
+                      <td><a href="https://www.racingloufc.com/news/2023/10/06/team-news-taylor-aylmer-to-make-first-regular-season-start/" target="_blank">Team News: Aylmer to make first regular season start</a></td>
+                      <td><a href="https://www.espn.com/soccer/player/_/id/248457/taylor-aylmer" target="_blank">Taylor Aylmer - Racing Louisville FC Midfielder - ESPN</a></td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td><a href="https://www.instagram.com/tayloraylmer/" target="_blank">Taylor Aylmer - Instagram</a></td>
+                    </tr>
+                </table>
+                </div>
+                <li>The fact is stated in the <emph>main body</emph> of the article text, not in a table, list, image, image caption, embedded tweet, etc.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;">Taylor Aylmer is a member of the Racing Louisville FC sports team</span></p>
+                <table style="width:100%">
+                  <tr>
+                    <th style="width:50%">✔️ Good Sources</th>
+                    <th style="width:50%">❌ Bad Sources</th>
+                  </tr>
+                  <tr>
+                    <td><a href="https://www.racingloufc.com/news/2023/10/06/team-news-taylor-aylmer-to-make-first-regular-season-start/" target="_blank">Team News: Aylmer to make first regular season start</a></td>
+                    <td><a href="https://www.racingloufc.com/news/2023/10/06/recap-racing-rallies-to-beat-orlando-keep-playoff-hopes-alive/" target="_blank">Recap: Racing rallies to beat Orlando, keep playoff hopes alive</a>: Fact is in a list at the end, not the main text</td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td><a href="https://www.courier-journal.com/story/sports/2023/10/19/racing-louisville-fc-midfielder-jaelin-howell-national-womens-soccer-league/71154713007/" target="_blank">Jaelin Howell, Racing Louisville bring community together to help people with Down syndrome</a>: Fact is in an image caption but nowhere in the main text</td>
+                  </tr>
+                </table>
+                </div>
+                <li>The article is a web page, not a PDF or other file format.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;">Ali Shojaie is a IMS Fellow</span></p>
+                <table style="width:100%">
+                  <tr>
+                    <th style="width:50%">✔️ Good Source</th>
+                    <th style="width:50%">❌ Bad Source</th>
+                  </tr>
+                  <tr>
+                    <td><a href="https://sph.washington.edu/news-events/sph-blog/Ali-Shojaie-elected-fellow-Institute-of-Mathematical-Statistics" target="_blank">Ali Shojaie elected fellow of the Institute of Mathematical Statistics</a></td>
+                    <td><a href="https://imstat.org/wp-content/uploads/2023/04/Bulletin52_4.pdf" target="_blank">IMS Carver Award 2023</a>: Source is a PDF file, not a web page</td>
+                  </tr>
+                </table>
+                </div>
+                <li>The article is written in English.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;"> Emad Mostaque is CEO of Stability AI (was True from 2020 to 2024-03-23)</span></p>
+                <table style="width:100%">
+                    <tr>
+                    <th style="width:50%">✔️ Good Source</th>
+                    <th style="width:50%">❌ Bad Source</th>
+                    </tr>
+                    <tr>
+                    <td><a href="https://techcrunch.com/2022/08/12/a-startup-wants-to-democratize-the-tech-behind-dall-e-2-consequences-be-damned/?guccounter=1/" target="_blank">This startup is setting a DALL-E 2-like AI free, consequences be damned</a></td>
+                    <td><a href="https://protidinerbangladesh.com/technology/33844/%E0%A6%8F%E0%A6%86%E0%A6%87%E0%A7%9F%E0%A7%87%E0%A6%B0-%E0%A6%95%E0%A6%BE%E0%A6%B0%E0%A7%8D%E0%A6%AF%E0%A6%95%E0%A7%8D%E0%A6%B0%E0%A6%AE-%E0%A6%B8%E0%A7%8D%E0%A6%A5%E0%A6%97%E0%A6%BF%E0%A6%A4-%E0%A6%B0%E0%A6%BE%E0%A6%96%E0%A6%A4%E0%A7%87-%E0%A6%B6%E0%A7%80%E0%A6%B0%E0%A7%8D%E0%A6%B7-%E0%A6%AC%E0%A6%BF%E0%A6%B6%E0%A7%87%E0%A6%B7%E0%A6%9C%E0%A7%8D%E0%A6%9E%E0%A6%A6%E0%A7%87%E0%A6%B0-%E0%A6%85%E0%A6%A8%E0%A7%81%E0%A6%B0%E0%A7%8B%E0%A6%A7" target="_blank">এআইয়ের কার্যক্রম স্থগিত রাখতে শীর্ষ বিশেষজ্ঞদের অনুরোধ</a>: Article is not in English</td>
+                    </tr>
+                </table>
+                </div>
+                <!-- <li>The article implies that the fact is true <emph>at the time that the article was written</emph>.
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;"> Emad Mostaque is CEO of Stability AI (was True from 2020 to 2024-03-23)</span></p>
+                <table style="width:100%">
+                    <tr>
+                    <th style="width:50%">✔️ Good Source</th>
+                    <th style="width:50%">❌ Bad Source</th>
+                    </tr>
+                    <tr>
+                    <td><a href="https://techcrunch.com/2022/08/12/a-startup-wants-to-democratize-the-tech-behind-dall-e-2-consequences-be-damned/?guccounter=1/" target="_blank">This startup is setting a DALL-E 2-like AI free, consequences be damned</a></td>
+                    <td><a href="https://protidinerbangladesh.com/technology/33844/%E0%A6%8F%E0%A6%86%E0%A6%87%E0%A7%9F%E0%A7%87%E0%A6%B0-%E0%A6%95%E0%A6%BE%E0%A6%B0%E0%A7%8D%E0%A6%AF%E0%A6%95%E0%A7%8D%E0%A6%B0%E0%A6%AE-%E0%A6%B8%E0%A7%8D%E0%A6%A5%E0%A6%97%E0%A6%BF%E0%A6%A4-%E0%A6%B0%E0%A6%BE%E0%A6%96%E0%A6%A4%E0%A7%87-%E0%A6%B6%E0%A7%80%E0%A6%B0%E0%A7%8D%E0%A6%B7-%E0%A6%AC%E0%A6%BF%E0%A6%B6%E0%A7%87%E0%A6%B7%E0%A6%9C%E0%A7%8D%E0%A6%9E%E0%A6%A6%E0%A7%87%E0%A6%B0-%E0%A6%85%E0%A6%A8%E0%A7%81%E0%A6%B0%E0%A7%8B%E0%A6%A7" target="_blank">এআইয়ের কার্যক্রম স্থগিত রাখতে শীর্ষ বিশেষজ্ঞদের অনুরোধ</a>: Article is not in English</td>
+                    </tr>
+                </table>
+                </div>
+                </li> -->
+                <li>Avoid articles that state that the fact is or is about to become false. These are generally written near or past the end date of a fact being true.</li>
+                <div style="border:1px solid black; padding:10px; margin:10px;">
+                <p><strong>Example:</strong> For fact
+                <span id="valid_triple" style="font-size: 1em;">Emad Mostaque is CEO of Stability AI (was True from 2020 to 2024-03-23)</span></p>
+                <table style="width:100%">
+                    <tr>
+                    <th style="width:50%">✔️ Good Source</th>
+                    <th style="width:50%">❌ Bad Source</th>
+                    </tr>
+                    <tr>
+                    <td><a href="https://techcrunch.com/2022/08/12/a-startup-wants-to-democratize-the-tech-behind-dall-e-2-consequences-be-damned/?guccounter=1/" target="_blank">This startup is setting a DALL-E 2-like AI free, consequences be damned</a></td>
+                    <td><a href="https://www.forbes.com/sites/kenrickcai/2024/03/22/stability-ai-founder-emad-mostaque-plans-to-resign-as-ceo-sources-say/?sh=7cd4ad4b5239" target="_blank">Stability AI founder Emad Mostaque plans to resign as CEO, sources say</a>: Article is about the fact being about to be false</td>
+                    </tr>
+                </table>
+                </div>
+            </ol>
+            <p>If no listed articles satisfy these requirements, you have the option to either find a news article that satisfies the requirements (a google search link is provided for reference, you may need to manually adjust the query or date parameters) or selecting "cannot find source" if you cannot find any source in a reasonable amount of time.</p>
+            <p>There may also be a second fact that you need to avoid. If you see this fact in the article, do not select it as a source.</p>
+            <!-- <p><b>Note:</b> the dates around the fact may be approximate. Use them as a rough guideline to find articles written generally between the start and end dates. (The start and end years are accurate, but the months and days may be approximate.)</p> -->
+            <p><b>Tip:</b> You may use "ctrl-f" (find tool) to quickly validate whether or not a fact is in the article.</p>
+        </div>
+        <div class="login">
+            <label for="username">Prolific ID:</label><br>
+            <input type="text" id="username" name="username">
+        </div>
+        <input type="submit" value="Login">
+    </form>
+</body>
+</html>
