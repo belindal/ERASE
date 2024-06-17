@@ -1,6 +1,8 @@
 # ERASE
 Code and Data for "Language Modeling with Editable External Knowledge"
 
+### This repository is a work in progress.
+
 ## Setup
 To setup your environment, run:
 ```bash
