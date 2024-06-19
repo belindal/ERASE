@@ -1,10 +1,6 @@
 # ERASE
 Code and Data for [Language Modeling with Editable External Knowledge](https://arxiv.org/html/2406.11830v1).
 
-<!-- insert image -->
-![teaser](imgs/teaser.png)
-
-
 ## Setup
 To setup your environment, run:
 ```bash
