@@ -1,19 +1,15 @@
 import time
-from typing import List, Union
+from typing import List
 from openai import OpenAI
 import requests
 import os
-import textwrap
 import json
 
-from models.kb_model import KBModel, probability_mapping, TOKENIZER
+from models.kb_model import KBModel, TOKENIZER
 from abc import ABC
-import regex as re
-import numpy as np
 from tqdm import tqdm
 import torch
 import transformers
-from transformers import AutoTokenizer
 
 
 api_pricing = {
@@ -45,14 +41,6 @@ api_pricing = {
         "prompt_tokens": 1.2 / 1000000,
         "completion_tokens": 1.2 / 1000000,
     },
-    "Meta-Llama-3-8B-Instruct": {
-        "prompt_tokens": 0.0,
-        "completion_tokens": 0.0,
-    },
-    "Meta-Llama-3-70B-Instruct": {
-        "prompt_tokens": 0.0,
-        "completion_tokens": 0.0,
-    },
     "meta-llama/Llama-3-70b-chat-hf": {
         "prompt_tokens": 0.9 / 1000000,
         "completion_tokens": 0.9 / 1000000,
@@ -67,25 +55,33 @@ class LangModel(ABC):
     """
     Model for querying the OpenAI API.
     """
-    def __init__(self, model_name, cache_dir="openai_cache", use_cache=True, inference_kwargs={}, context_length=4000, save_fn="results/", tokenizer=None, logging=False, **kwargs):
+    def __init__(
+        self,
+        model_name,
+        cache_dir="openai_cache",
+        use_cache=True,
+        inference_kwargs={},
+        context_length=4000,
+        save_fn="results/",
+        tokenizer=None,
+        logging=False,
+        local_model_path=None,
+        hops=1,
+        save_as_facts=False,
+        overwrite_facts=False,
+        retrieve_facts=False,
+        device="cuda",
+        **kwargs,
+    ):
         self.model_name = model_name
         if tokenizer is not None:
             self.tokenizer = tokenizer
         else:
             self.tokenizer = TOKENIZER[self.model_name]
-        if "meta-llama" in self.model_name.lower():
-            try:
-                self.pipeline = transformers.pipeline(
-                    "text-generation",
-                    model=f"/raid/lingo/models/{self.model_name}",
-                    model_kwargs={"torch_dtype": torch.bfloat16}, device_map="auto"
-                )
-            except:
-                pass
         self.use_cache = use_cache
         if use_cache:
             self.openai_cache_file = {
-                self.model_name: os.path.join(cache_dir, f"{self.model_name}.jsonl")  # The path to write the cache entries to.
+                self.model_name: os.path.join(cache_dir, f"{self.model_name.replace('/', '_')}.jsonl")  # The path to write the cache entries to.
             }
             self.openai_cache = {
                 self.model_name: self.load_openai_cache(self.openai_cache_file[self.model_name])  # The openai cache dict. Stores the API responses to avoid duplicate queries.
@@ -98,7 +94,18 @@ class LangModel(ABC):
         self.inference_kwargs = inference_kwargs
         self.logging = logging
         self.save_fn = save_fn
-        if "gpt" in self.model_name:
+
+        self.local_model_path = local_model_path
+        if self.local_model_path:
+            try:
+                self.pipeline = transformers.pipeline(
+                    "text-generation",
+                    model=self.local_model_path,
+                    model_kwargs={"torch_dtype": torch.bfloat16}, device_map="auto"
+                )
+            except:
+                pass
+        elif "gpt" in self.model_name:
             self.client = OpenAI(
                 api_key=os.environ.get("OPENAI_API_KEY"),
             )
@@ -109,6 +116,12 @@ class LangModel(ABC):
                 "content-type": "application/json",
                 "Authorization": f"Bearer {os.environ.get('TOGETHER_API_KEY')}"
             }
+        self.hops = hops
+        self.query_model_name = "gpt-4"
+        self.save_as_facts = save_as_facts
+        self.overwrite_facts = overwrite_facts
+        self.retrieve_facts = retrieve_facts
+        self.device = device
 
 
     def load_openai_cache(self, openai_cache_file):
@@ -142,7 +155,7 @@ class LangModel(ABC):
         if model_name is None:
             model_name = self.model_name
         if model_name not in self.openai_cache_file:
-            self.openai_cache_file[model_name] = os.path.join("cache", f"{model_name}.jsonl")
+            self.openai_cache_file[model_name] = os.path.join("cache", f"{model_name.replace('/', '_')}.jsonl")
         if model_name not in self.openai_cache:
             self.openai_cache[model_name] = self.load_openai_cache(self.openai_cache_file[model_name])
         if self.use_cache:
@@ -153,7 +166,7 @@ class LangModel(ABC):
 
     # @retry(wait=wait_random_exponential(min=1, max=60))
     def query_api(self, messages, inference_kwargs=None, model_name=None, use_cache=True):
-        '''Queries the OpenAI/Together API with the given messages, or runs inference if model_name = "Meta-Llama-3-8B-Instruct" (local copy of llama 3)
+        '''Queries the OpenAI/Together API with the given messages, or runs inference if self.local_model_path is set.
         
         NOTE: This function mutates the messages list to add the new_message and the response from the API.
         
@@ -170,7 +183,7 @@ class LangModel(ABC):
             model_name = self.model_name
         if model_name not in self.openai_cache:
             if self.use_cache:
-                self.openai_cache_file[model_name] = os.path.join("cache", f"{model_name}.jsonl")
+                self.openai_cache_file[model_name] = os.path.join("cache", f"{model_name.replace('/', '_')}.jsonl")
                 self.openai_cache[model_name] = self.load_openai_cache(self.openai_cache_file[model_name])
             else:
                 self.openai_cache[model_name] = None
@@ -182,28 +195,7 @@ class LangModel(ABC):
             wait_time = 1
             while True:
                 try:
-                    if "gpt" in model_name:
-                        if "repetition_penalty" in inference_kwargs:
-                            del inference_kwargs["repetition_penalty"]
-                        response = self.client.chat.completions.create(
-                            model=model_name,
-                            messages=messages,
-                            logprobs=True,
-                            **inference_kwargs,
-                        )
-                        response = response.dict()
-                    elif "Mixtral" in model_name or "meta-llama/Llama-3" in model_name:
-                        payload = {
-                            "model": model_name,
-                            "messages": messages,
-                            "logprobs": True,
-                            "echo": True,
-                            "stop": ["</s>", "<|eot_id|>", *inference_kwargs.pop("stop", [])],
-                            **inference_kwargs,
-                        }
-                        response = requests.post(self.url, json=payload, headers=self.headers)
-                        response = response.json()
-                    elif model_name == "Meta-Llama-3-8B-Instruct":
+                    if self.local_model_path:
                         prompt = self.pipeline.tokenizer.apply_chat_template(
                             messages,
                             tokenize=False,
@@ -236,8 +228,30 @@ class LangModel(ABC):
                             "prompt": prompt,
                             "output": response_text,
                         }
+                    elif "gpt" in model_name:
+                        if "repetition_penalty" in inference_kwargs:
+                            del inference_kwargs["repetition_penalty"]
+                        response = self.client.chat.completions.create(
+                            model=model_name,
+                            messages=messages,
+                            logprobs=True,
+                            **inference_kwargs,
+                        )
+                        response = response.dict()
+                    elif "Mixtral" in model_name or "meta-llama/Llama-3" in model_name:
+                        payload = {
+                            "model": model_name,
+                            "messages": messages,
+                            "logprobs": True,
+                            "echo": True,
+                            "stop": ["</s>", "<|eot_id|>", *inference_kwargs.pop("stop", [])],
+                            **inference_kwargs,
+                        }
+                        response = requests.post(self.url, json=payload, headers=self.headers)
+                        response = response.json()
                     else:
                         raise ValueError(f"Model {model_name} not recognized.")
+
                     if "error" in response and "gpt" not in model_name:
                         print(response['error'])
                         if "Input validation error:" in str(response['error']["message"]):
@@ -252,7 +266,10 @@ class LangModel(ABC):
                     break
                 except Exception as e:
                     print(e)
-                    print(response.status_code)
+                    try:
+                        print(response.status_code)
+                    except:
+                        breakpoint()
                     if "gpt" not in model_name and response.status_code in [504, 520, 524, 502]:
                         print(response.status_code)
                         print(f"Rate limited. Waiting {wait_time} seconds then retrying...")
@@ -270,7 +287,8 @@ class LangModel(ABC):
                         messages = messages[-1:]
                         continue
             self.save_openai_cache({messages_cache_key: response}, model_name=model_name)
-        if "gpt" in model_name or "Mixtral" in model_name or "meta-llama/Llama-3" in model_name:
+
+        if not self.local_model_path:
             for tokens_type in response["usage"]:
                 self.total_tokens_dict[tokens_type] += response["usage"][tokens_type]
             response_text = response['choices'][0]['message']['content']
@@ -289,6 +307,8 @@ class LangModel(ABC):
         Returns:
             float: The cost in USD.
         """
+        if self.local_model_path is not None:
+            return 0
         return self.total_tokens_dict["completion_tokens"] * api_pricing[self.model_name]["completion_tokens"] + self.total_tokens_dict["prompt_tokens"] * api_pricing[self.model_name]["prompt_tokens"]
 
 
@@ -371,16 +391,10 @@ class ConvoModel(LangModel):
     Model for querying the OpenAI API for a response to a HMM task.
     """
     def __init__(
-        self, model_name, cache_dir="openai_cache", use_cache=True, inference_kwargs={},
-        device="cuda", context_length=4000,
-        save_as_facts=False, overwrite_facts=False, retrieve_facts=False,
-        save_fn="results/",
-        hops=1,
-        tokenizer=None,
-        logging=False,
+        self,
         **kwargs,
     ):
-        super().__init__(model_name=model_name, cache_dir=cache_dir, use_cache=use_cache, inference_kwargs=inference_kwargs, context_length=context_length, save_fn=save_fn, tokenizer=tokenizer, logging=logging)
+        super().__init__(**kwargs)
         self.metrics = {
             "accuracy": {},
             "accuracy_by_task": {},
@@ -395,12 +409,6 @@ class ConvoModel(LangModel):
             "score_per_percent_total_updates": {},
             "score_per_percent_total_updates_by_task": {},
         }
-        self.hops = hops
-        self.query_model_name = "gpt-4"
-        self.save_as_facts = save_as_facts
-        self.overwrite_facts = overwrite_facts
-        self.retrieve_facts = retrieve_facts
-        self.device = device
         self.data_model = KBModel(
             self.model_name,
             self.save_as_facts, self.overwrite_facts, self.retrieve_facts,
@@ -691,16 +699,10 @@ class NewsModel(LangModel):
     Model for querying the OpenAI API for a response to a HMM task.
     """
     def __init__(
-        self, model_name, cache_dir="openai_cache", use_cache=True, inference_kwargs={},
-        device="cuda", context_length=4000,
-        save_as_facts=False, overwrite_facts=False, retrieve_facts=False,
-        save_fn="results/",
-        hops=1,
-        tokenizer=None,
-        logging=False,
+        self,
         **kwargs,
     ):
-        super().__init__(model_name=model_name, cache_dir=cache_dir, use_cache=use_cache, inference_kwargs=inference_kwargs, context_length=context_length, save_fn=save_fn, tokenizer=tokenizer, logging=logging)
+        super().__init__(**kwargs)
         self.metrics = {
             "accuracy": [0,0],
             "accuracy_per_ts": {},
@@ -708,12 +710,6 @@ class NewsModel(LangModel):
             "accuracy_per_percent_total_updates": {},
             "accuracy_per_ts_by_type": {},
         }
-        self.hops = hops
-        self.query_model_name = "gpt-4"
-        self.save_as_facts = save_as_facts
-        self.overwrite_facts = overwrite_facts
-        self.retrieve_facts = retrieve_facts
-        self.device = device
         self.model_scores_per_ts = {}
         self.model_scores_per_num_updates = {}
         self.model_scores_per_percent_total_updates = {}

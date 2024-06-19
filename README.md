@@ -16,18 +16,31 @@ bash setup.sh
 
 
 ## Run ERASE
+To run Mixtral, set your TogetherAI API token
+```bash
+export TOGETHER_API_KEY=<TOGETHER_API_KEY>
+```
+
+Set your OpenAI API token if you wish to run GPT* models
+```bash
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+```
+
 To run ERASE on the CLARK-News dataset, use:
 ```bash
 python lm_eval.py \
 --dataset news \
 --datapath CLARK_news/ \
---model_name [mistralai/Mixtral-8x7B-Instruct-v0.1|Meta-Llama-3-8B-Instruct] \
+(--model_name [mistralai/Mixtral-8x7B-Instruct-v0.1|meta-llama/Llama-3-8b-chat-hf]) \
+(--local_model_path <local_model_fp> \)
 --context_length [2048|4096] \
 --save_as_facts \
 --retrieve_facts similarity \
 (--overwrite_facts similarity --edit_hops 1)
 ```
 
+* `--model_name` sets the model name for querying the TogetherAI API (for open-source models) or OpenAI API (for GPT* models). If this flag is set, queries the respective API for model inference. Otherwise, queries a local model.
+* `--local_model_path` sets the filepath if we want to use a local copy of a Huggingface Instruct model. One of `--model_name` or `--local_model_path` must be set.
 * `--context_length` sets the context window of the model
 * `--save_as_facts` toggles saving the entries to the KB as facts (rather than as passages)
 * `--retrieve_facts` sets how we want to retrieve KB entries. Set it to `similarity` for dense retrieval. To turn off retrieval, do not include this flag. 
@@ -46,7 +59,7 @@ To run our data collection process, follow:
 
 1. Get Wikidata triples that change over time
 ```bash
-python script/get_wikidata_triples.py
+python script/get_wikidata_triples.py --data_dir <direction to store triples>
 ```
 
 2. Annotate source documents, following:

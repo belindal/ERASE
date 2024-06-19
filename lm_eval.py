@@ -6,14 +6,20 @@ from pandas import DataFrame
 import argparse
 import torch
 from models import MODELS
+from models.lang_model import api_pricing
 from models.kb_model import TOKENIZER
 import time
 from transformers import AutoTokenizer
 
 
 def main(args):
-    os.makedirs(f"results/{args.dataset}_{args.model_name.replace('/', '_')}", exist_ok=True)
-    save_fn = f"results/{args.dataset}_{args.model_name.replace('/', '_')}/results_{'facts_' if args.save_as_facts else ''}{'overwrite_facts_'+args.overwrite_facts if args.overwrite_facts else ''}{'retrieve_'+args.retrieve_facts if args.retrieve_facts else ''}{'_'+str(args.edit_hops)+'_edithops' if args.overwrite_facts else ''}.csv"
+    assert args.model_name is not None or args.local_model_path is not None, "Must specify a model name or local model path"
+    if args.model_name is None:
+        model_name = args.local_model_path
+    else:
+        model_name = args.model_name
+    os.makedirs(f"results/{args.dataset}_{model_name.replace('/', '_')}", exist_ok=True)
+    save_fn = f"results/{args.dataset}_{model_name.replace('/', '_')}/results_{'facts_' if args.save_as_facts else ''}{'overwrite_facts_'+args.overwrite_facts if args.overwrite_facts else ''}{'retrieve_'+args.retrieve_facts if args.retrieve_facts else ''}{'_'+str(args.edit_hops)+'_edithops' if args.overwrite_facts else ''}.csv"
     print(f"Saving results to {save_fn}")
 
     if args.logging:
@@ -22,12 +28,13 @@ def main(args):
         open(f"{save_fn[:-4]}_question_outputs.txt", "w").close()
 
     print("Loading tokenizer...")
-    tokenizer = TOKENIZER[args.model_name]
-    if "meta-llama" in args.model_name.lower():
+    if args.local_model_path is not None:
         try:
-            tokenizer = AutoTokenizer.from_pretrained(f"/raid/lingo/models/{args.model_name}")
+            tokenizer = AutoTokenizer.from_pretrained(args.local_model_path)
         except:
             tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    else:
+        tokenizer = TOKENIZER.get(model_name, AutoTokenizer.from_pretrained("gpt2"))
 
     # load data
     print("Loading data...")
@@ -54,9 +61,9 @@ def main(args):
         }
     else:
         inference_kwargs = {}
-    os.makedirs(os.path.dirname(f"{args.lm_cache_dir}/{args.model_name}"), exist_ok=True)
-    model = MODELS[args.model_type][args.dataset](
-        model_name=args.model_name,
+    os.makedirs(os.path.dirname(f"{args.lm_cache_dir}/{model_name.replace('/', '_')}"), exist_ok=True)
+    model = MODELS[args.dataset](
+        model_name=model_name,
         context_length=args.context_length,
         cache_dir=args.lm_cache_dir,
         use_cache=(not args.no_cache),
@@ -71,6 +78,7 @@ def main(args):
         hops=args.edit_hops,
         tokenizer=tokenizer,
         logging=args.logging,
+        local_model_path=args.local_model_path,
     )
     end_time = time.time()
     print(f"Loaded after {end_time - start_time:.1f}s")
@@ -161,8 +169,7 @@ def main(args):
         else:
             accuracies = round(metrics[metric_to_display], 2)
         desc = f"{metric_to_display}: {accuracies}"
-        if args.model_type == "gpt":
-            desc += f", Cost: ${model.get_total_cost():.2f}"
+        desc += f", Cost: ${model.get_total_cost():.2f}"
         pbar.set_description(desc)
 
 
@@ -173,14 +180,13 @@ def main(args):
 
     # save results
     results.to_csv(save_fn, index=False)
-    json.dump(final_kbs, open(f"results/{args.dataset}_{args.model_name.replace('/', '_')}/kb_{'facts_' if args.save_as_facts else ''}{'overwrite_facts_' if args.overwrite_facts else ''}{'retrieve_'+args.retrieve_facts if args.retrieve_facts else ''}{'_'+str(args.edit_hops)+'_edithops' if args.overwrite_facts else ''}.json", "w"), indent=4)
+    json.dump(final_kbs, open(f"results/{args.dataset}_{model_name.replace('/', '_')}/kb_{'facts_' if args.save_as_facts else ''}{'overwrite_facts_' if args.overwrite_facts else ''}{'retrieve_'+args.retrieve_facts if args.retrieve_facts else ''}{'_'+str(args.edit_hops)+'_edithops' if args.overwrite_facts else ''}.json", "w"), indent=4)
 
 
 def add_arguments(parser):
     parser.add_argument("--datapath", type=str, default=None)  # The path to the dataset (None for default).
-    parser.add_argument("--dataset", type=str, default="babi")  # The data type (e.g. news, convo).
-    parser.add_argument("--model_type", type=str, default="gpt")  # The model class to use (e.g. gpt, HF, llama).
-    parser.add_argument("--model_name", type=str, default="gpt-3.5-turbo")  # The specific model name of the model to use (e.g. gpt-3.5-turbo, gpt-4, lmsys/vicuna-7b-v1.5, lmsys/vicuna-13b-v1.5, gpt2, mistralai/Mistral-7B-v0.1, mistralai/Mistral-7B-Instruct-v0.1, mistralai/Mixtral-8x7B-Instruct-v0.1, mistralai/Mixtral-8x7B-Instruct-v0.1, meta-llama/Llama-3-70b-chat-hf, meta-llama/Llama-3-8b-chat-hf, Meta-Llama-3-8B-Instruct).
+    parser.add_argument("--dataset", type=str, default="news")  # The data type (e.g. news, convo).
+    parser.add_argument("--model_name", type=str, default=None, choices=list(api_pricing.keys()) + [None])  # The specific model name of the model to use.
     parser.add_argument("--tasks", type=str, default=None)  # The tasks under the dataset to use (e.g. singlehop_convos/multihop_convos for convo).
     parser.add_argument("--no_cache", action="store_true", default=False)  # Don't use the cache (will repeatedly query LM).
     parser.add_argument("--use_cuda", action="store_true", default=True)  # Use CUDA if available.
@@ -192,6 +198,7 @@ def add_arguments(parser):
     parser.add_argument("--edit_hops", type=int, default=1)  # How many hops of facts to retrieve for editing.
     parser.add_argument("--logging", action="store_true", default=False)  # Log the results.
     parser.add_argument("--lm_cache_dir", type=str, default="cache")  # The directory to store cached LM responses.
+    parser.add_argument("--local_model_path", type=str, default=None)  # The path to use a local model.
 
 
 

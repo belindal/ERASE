@@ -3,11 +3,18 @@ import json
 from tqdm import tqdm
 import os
 import pandas as pd
+import argparse
+import re
+from datetime import datetime, timezone
 
 # Define the URL of the Wikibase SPARQL endpoint
 url = 'https://query.wikidata.org/sparql'
 
-DATA_DIR = "data"
+parser = argparse.ArgumentParser()
+parser.add_argument("--data_dir", type=str, default="wikidata-data/", help="Directory to store the data")
+args = parser.parse_args()
+
+DATA_DIR = args.data_dir
 os.makedirs(DATA_DIR, exist_ok=True)
 prop_to_subjs_file = f"{DATA_DIR}/prop_to_subj.json"
 property_to_results_file = f"{DATA_DIR}/property_to_results.json"
@@ -164,9 +171,6 @@ subsets = {
      ],
 }
 
-
-import re
-from datetime import datetime, timezone
 def datetime_transform(x):
     if x != x or "http" in x:
         return pd.to_datetime("2024-03-13T00:00:00Z")

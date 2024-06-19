@@ -20,13 +20,6 @@ class NewsDataset(Dataset):
     def __init__(self, data_dir="CLARK_news/", tasks="full", context_length=1000, tokenizer=None):
         self.nltk_tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
         self.tokenizer = tokenizer
-        if self.tokenizer is None:
-            self.tokenizer = TOKENIZER[self.model_name]
-            if "meta-llama" in self.model_name.lower():
-                try:
-                    self.tokenizer = AutoTokenizer.from_pretrained(f"/raid/lingo/models/{self.model_name}")
-                except:
-                    self.tokenizer = AutoTokenizer.from_pretrained(f"/raid/lingo/models/Meta-Llama-3-8B-Instruct")
         self.context_length = context_length
         self.data = self.load_data(data_dir, tasks)
 

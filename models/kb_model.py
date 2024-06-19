@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Tuple, Union
 from collections import namedtuple
 import math
 import numpy as np
-from transformers import AutoTokenizer, AutoModelForTokenClassification, AutoModelForSeq2SeqLM, pipeline, PreTrainedTokenizer, PreTrainedTokenizerFast
+from transformers import AutoTokenizer, AutoModelForTokenClassification, AutoModelForSeq2SeqLM, pipeline
 import faiss
 from pandas import Timestamp
 from sentence_transformers import SentenceTransformer
@@ -125,10 +125,7 @@ class KBModel:
             self.index = faiss.IndexFlatIP(self.model_output_dim)  # 768
             self.retrieval_model.to(self.device)
             self.retrieval_model.eval()
-        if tokenizer is None:
-            self.tokenizer = TOKENIZER[self.model_name]
-        else:
-            self.tokenizer = tokenizer
+        self.tokenizer = tokenizer
         self.num_sentences_to_retrieve = 5
         self.context_length = context_length
 

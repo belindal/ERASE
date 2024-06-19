@@ -10,7 +10,6 @@ from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 TOKENIZER = {
     "mistralai/Mixtral-8x7B-Instruct-v0.1": MistralTokenizer.v3(),
     "mistralai/Mixtral-8x22B-Instruct-v0.1": MistralTokenizer.v3(),
-    "Meta-Llama-3-8B-Instruct": None,
     "meta-llama/Llama-3-70b-chat-hf": None,
     "meta-llama/Llama-3-8b-chat-hf": None,
     "gpt-4o": tiktoken.get_encoding("cl100k_base"),
