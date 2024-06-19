@@ -11,20 +11,24 @@ from datetime import datetime, timezone
 url = 'https://query.wikidata.org/sparql'
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data_dir", type=str, default="wikidata-data/", help="Directory to store the data")
+parser.add_argument("--data_dir", type=str, default="data/", help="Directory to store the data")
 args = parser.parse_args()
 
 DATA_DIR = args.data_dir
 os.makedirs(DATA_DIR, exist_ok=True)
-prop_to_subjs_file = f"{DATA_DIR}/prop_to_subj.json"
-property_to_results_file = f"{DATA_DIR}/property_to_results.json"
-dataframe_file = f"{DATA_DIR}/property_to_results.csv"
-query_to_results_cache_file = f"{DATA_DIR}/query_to_results_cache.json"
+prop_to_subjs_file = os.path.join(DATA_DIR, f"prop_to_subj.json")
+property_to_results_file = os.path.join(DATA_DIR, f"property_to_results.json")
+dataframe_file = os.path.join(DATA_DIR, f"property_to_results.csv")
+query_to_results_cache_file = os.path.join(DATA_DIR, f"query_to_results_cache.json")
 
 properties = [
-    "P169", "P35", "P488",
+    "P169",
+    "P35",
+    "P488",
     "P39",
-    "P54", "P102", "P26", "P451", "P551", "P108",
+    "P54",
+    "P102", "P26", "P451", "P551",
+    "P108",
     "P159",
     "P263",
     "P463",
@@ -244,8 +248,11 @@ def chunks(lst, n):
         yield lst[i:i + n]
 
 # get results incrementally
-query_to_results_cache = json.load(open(query_to_results_cache_file))
-print(len(query_to_results_cache))
+if os.path.exists(query_to_results_cache_file):
+    query_to_results_cache = json.load(open(query_to_results_cache_file))
+    # print(len(query_to_results_cache))
+else:
+    query_to_results_cache = {}
 
 if os.path.exists(property_to_results_file):
     property_to_results = json.load(open(property_to_results_file))
@@ -305,7 +312,9 @@ WHERE {{
                 print("Cache hit")
             else:
                 print(query)
-                print(json.dumps(query))    
+                print(json.dumps(query))
+                data = requests.get(url, params={'format': 'json', 'query': query}).json()
+                query_to_results_cache[query] = data['results']['bindings']
             for item in data['results']['bindings']:
                 property_to_results[prop].append(item)
 
@@ -327,8 +336,8 @@ for prop in property_to_results:
 
 
 property_to_results_entries = pd.DataFrame.from_dict(property_to_results_entries)
-property_to_results_entries["objectLabel"] = property_to_results_entries.apply(lambda x: x["objectLabel"] + " " + x["ofLabel"] if x["of"] == x["of"] else x["objectLabel"], axis=1)
-property_to_results_entries[property_to_results_entries["of"] == property_to_results_entries["of"]]
+property_to_results_entries["objectLabel"] = property_to_results_entries.apply(lambda x: x["objectLabel"] + " " + x["ofLabel"] if ("of" in property_to_results_entries and x["of"] == x["of"]) else x["objectLabel"], axis=1)
+# property_to_results_entries[property_to_results_entries["of"] == property_to_results_entries["of"]]
 property_to_results_entries_grouped = property_to_results_entries.groupby(["subject", "property", "object", "startDate"]).agg({
     "subjectLabel": "first","propertyLabel": "first", "objectLabel": "first",
     "endDate": "first",

@@ -294,20 +294,10 @@ def extract_queries(query, tbs):
             year -= 1
         date = datetime.datetime(year, month, 1).strftime("%m/%Y")
         results.append({"link": link, "title": title, "date": date})
-    # if len(results) >= 10:
-    #     breakpoint()
-    #     temp_end_date = min(end_date, start_date + datetime.timedelta(days=365))
-    #     breakpoint()
-    #     while len(results) < 10 and temp_end_date < end_date:
-    #         for result in googlesearch.search(
-    #             query, num=10, stop=10,
-    #             tbs=googlesearch.get_tbs(from_date=start_date, to_date=end_date),
-    #             extra_params={"tbm": "nws"}
-    #         ):
-    #             results.append(result)
     return results, search_url
 
-def main(source_csv, target_csv, filtered_target_csv, new_target_csv):
+
+def main(source_csv, target_csv):
     links_dict = {
         "subjectLabel": [],
         "propertyLabel": [],
@@ -317,12 +307,12 @@ def main(source_csv, target_csv, filtered_target_csv, new_target_csv):
         "searchURL": [],
         "endDateSus": [],
     }
-    if os.path.exists(target_csv):
-        existing_links = pd.read_csv(target_csv)
+    unfiltered_target_csv = target_csv.replace(".csv", "_unfiltered.csv")
+    if os.path.exists(unfiltered_target_csv):
+        existing_links = pd.read_csv(unfiltered_target_csv)
     else:
         existing_links = pd.DataFrame.from_dict(links_dict)
     
-    new_target_links = pd.read_csv(new_target_csv)
     for i in range(10):
         links_dict["links_" + str(i)] = []
     with open(source_csv) as f:
@@ -340,18 +330,13 @@ def main(source_csv, target_csv, filtered_target_csv, new_target_csv):
 
         num_results = 0
         for i, result in tqdm(results.iterrows(), total=results.shape[0]):
-            if i < 1:
-                continue
             links_dict["subjectLabel"].append(result["subjectLabel"])
             links_dict["propertyLabel"].append(result["propertyLabel"])
             links_dict["objectLabel"].append(result["objectLabel"])
             links_dict["startDate"].append(result["startDate"])
             links_dict["endDate"].append(result["endDate"])
             if result["objectLabel"] == result["objectLabel"]:
-                try:
-                    query = result["subjectLabel"] + " " + result["propertyLabel"] + " " + result["objectLabel"]
-                except:
-                    breakpoint()
+                query = result["subjectLabel"] + " " + result["propertyLabel"] + " " + result["objectLabel"]
             else:
                 query = result["subjectLabel"] + " " + result["propertyLabel"]
 
@@ -365,25 +350,6 @@ def main(source_csv, target_csv, filtered_target_csv, new_target_csv):
                 end_date = datetime.datetime.now()
             if end_date == start_date:
                 end_date = start_date + datetime.timedelta(days=365)
-            # if more than 10 results...
-            valid_rows = existing_links[(
-                existing_links["subjectLabel"] == result["subjectLabel"]
-            ) & (
-                existing_links["propertyLabel"] == result["propertyLabel"]
-            ) & (
-                existing_links["objectLabel"] == result["objectLabel"]
-            ) & (
-                existing_links["startDate"] == result["startDate"]
-            )]
-
-            tbs = googlesearch.get_tbs(from_date=start_date, to_date=end_date)
-            if len(valid_rows) > 0 and valid_rows.iloc[0]["links_9"] == valid_rows.iloc[0]["links_9"]:
-                # move end date earlier...
-                tbs = googlesearch.get_tbs(from_date=start_date, to_date=min(end_date, start_date + datetime.timedelta(days=90)))
-
-            links_dict["searchURL"].append(get_google_url(
-                query, num=10, stop=10, tbs=tbs, extra_params={"tbm": "nws"}
-            ))
 
             other_subj_attr_rows = results[(
                 results["subjectLabel"] == result["subjectLabel"]
@@ -407,63 +373,50 @@ def main(source_csv, target_csv, filtered_target_csv, new_target_csv):
                 existing_links["propertyLabel"] == result["propertyLabel"]
             ) & (
                 existing_links["objectLabel"] == result["objectLabel"]
+            ) & (
+                existing_links["startDate"] == result["startDate"]
             )]
 
-            new_target_rows = new_target_links[(
-                new_target_links["subjectLabel"] == result["subjectLabel"]
-            ) & (
-                new_target_links["propertyLabel"] == result["propertyLabel"]
-            ) & (
-                new_target_links["objectLabel"] == result["objectLabel"]
-            ) & (
-                new_target_links["startDate"] == result["startDate"]
-            )]
-
-            if new_target_rows.shape[0] > 0: #and (new_target_rows.iloc[0]["links_0"] != new_target_rows.iloc[0]["links_0"] or not new_target_rows.iloc[0]["links_0"].startswith("https://")):
+            tbs = googlesearch.get_tbs(from_date=start_date, to_date=min(end_date, start_date + datetime.timedelta(days=90)))
+            if len(valid_rows) > 0:
+                # already have result
                 for q in range(10):
-                    links_dict[f"links_{q}"].append(new_target_rows.iloc[0][f"links_{q}"])
-                if new_target_rows.iloc[0][f"links_0"] != new_target_rows.iloc[0][f"links_0"]:
-                    # expand to original end date
-                    tbs = googlesearch.get_tbs(from_date=start_date, to_date=end_date)
-                    query_results, search_url = extract_queries(query, tbs)
-                    for q in range(10):
-                        links_dict[f"links_{q}"].append(query_results[q] if q < len(query_results) else None)
-                    links_dict["searchURL"][-1] = search_url
-            elif valid_rows.shape[0] > 0 and ((valid_rows.iloc[0]["links_0"] != valid_rows.iloc[0]["links_0"])):
-                # copy existing if links_0 is nan (has no results) or links_9 is nan (has <10 results)
-                row = valid_rows.iloc[0]
-                for q in range(10):
-                    links_dict[f"links_{q}"].append(row[f"links_{q}"])
+                    links_dict[f"links_{q}"].append(valid_rows.iloc[0][f"links_{q}"])
+                links_dict["searchURL"].append(valid_rows.iloc[0]["searchURL"])
             elif result["objectLabel"] != result["objectLabel"]:
                 for q in range(10):
                     links_dict[f"links_{q}"].append(None)
+                links_dict["searchURL"].append(get_google_url(
+                    query, num=10, stop=10,
+                    tbs=tbs,
+                    extra_params={"tbm": "nws"},
+                ))
             else:
                 num_results += 1
-                # otherwise sources closest to beginning date
+                # get result
                 query_results, search_url = extract_queries(query, tbs)
-                # print(queries)
-                # if len(query_results) == 0:
-                #     print("No results found for query:", query)
                 if len(query_results) == 0:
                     # expand to original end date
                     tbs = googlesearch.get_tbs(from_date=start_date, to_date=end_date)
                     query_results, search_url = extract_queries(query, tbs)
                     for q in range(10):
                         links_dict[f"links_{q}"].append(query_results[q] if q < len(query_results) else None)
-                    links_dict["searchURL"][-1] = search_url
-                    # # use previous results
-                    # for q in range(10):
-                    #     links_dict[f"links_{q}"].append(valid_rows.iloc[0][f"links_{q}"] if valid_rows.shape[0] > 0 else None)
+                    if search_url is None:
+                        search_url = get_google_url(
+                            query, num=10, stop=10,
+                            tbs=tbs,
+                            extra_params={"tbm": "nws"},
+                        )
+                    links_dict["searchURL"].append(search_url)
                 else:
                     for q in range(10):
                         links_dict[f"links_{q}"].append(query_results[q] if q < len(query_results) else None)
+                    links_dict["searchURL"].append(search_url)
             links_df = pd.DataFrame.from_dict(links_dict)
-            with open(new_target_csv, "w") as f:
+            with open(unfiltered_target_csv, "w") as f:
                 links_df.to_csv(f, index=False)
         print(num_results)
 
-    #"""
-    # filter out (subj, rel) that don't change obj
     filtered_links_df = pd.DataFrame.from_dict(links_dict)
     for i, result in links_df.iterrows():
         if result["endDateSus"]:
@@ -480,20 +433,15 @@ def main(source_csv, target_csv, filtered_target_csv, new_target_csv):
         )]
         if other_subj_attr_rows.shape[0] == 0:
             filtered_links_df = filtered_links_df.drop(i)
-    with open(filtered_target_csv, "w") as f:
+    with open(target_csv, "w") as f:
         filtered_links_df.to_csv(f, index=False)
-    #"""
 
 
 if __name__ == "__main__":
     source_csv = "data/property_to_results.csv"
     target_csv = "data/property_to_results_links.csv"
-    filtered_target_csv = "data/property_to_results_links_filtered.csv"
-    new_target_csv = "data/property_to_results_links_new.csv"
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--source_csv", type=str, default=source_csv)
     parser.add_argument("--target_csv", type=str, default=target_csv)
-    parser.add_argument("--filtered_target_csv", type=str, default=filtered_target_csv)
-    parser.add_argument("--new_target_csv", type=str, default=new_target_csv)
     main(**vars(parser.parse_args()))

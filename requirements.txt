@@ -16,3 +16,4 @@ termcolor
 tiktoken
 tqdm
 transformers
+google

@@ -5,14 +5,15 @@ import pandas as pd
 from datetime import datetime
 import re
 import time
+import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--source_file", type=str, required=True, help="The file to read unannotated triples from")
+parser.add_argument("--target_file", type=str, required=True, help="The file to save the annotations to")
+parser.add_argument("--download_date", type=str, required=True, default=datetime.today().strftime("%Y-%m-%d"), help="The date the data was downloaded, in the format YYYY-MM-DD")
+args = parser.parse_args()
 
-split = "_position"
-split = "_sports"
-# split = ""
-source_file = f"notebooks/annotation_splits/property_to_results_larger{split}_subset_links_filtered.csv"
-target_file = f"AnnotationInterface/results/property_to_results_larger{split}_subset_links_raw.csv"
-ORIGIN_DATE = datetime.strptime("2024-04-11", "%Y-%m-%d")
+ORIGIN_DATE = datetime.strptime(args.download_date, "%Y-%m-%d")
 
 app = Flask(__name__)
 
@@ -40,7 +41,7 @@ if os.path.exists(annotated_triples_file):
         annotated_triples = [tuple(triple) for triple in annotated_triples]
 
 
-data = pd.read_csv(source_file)
+data = pd.read_csv(args.source_file)
 all_triples = []
 triples_and_sources = []
 for i, row in data.iterrows():
@@ -178,8 +179,8 @@ def next_question():
         distribute_triples(username, num_annotations=MIN_ANNOTATIONS)
         return render_template('questions.html', data=user_to_curr_annotating_triple_and_sources.get(username, []), username=username, time_left=NUM_MINUTES*60)
     else:
-        if os.path.exists(target_file):
-            annotated_data = pd.read_csv(target_file)
+        if os.path.exists(args.target_file):
+            annotated_data = pd.read_csv(args.target_file)
         else:
             annotated_data = pd.DataFrame(columns=["subjectLabel", "propertyLabel", "objectLabel", "startDate", "endDate", "selected_link", "source_date", "span", "annotator"])
 
@@ -240,7 +241,7 @@ def next_question():
             annotated_row = pd.DataFrame(annotated_row)
             annotated_data = pd.concat([annotated_data, annotated_row])
         
-        annotated_data.to_csv(target_file, index=False)
+        annotated_data.to_csv(args.target_file, index=False)
         json.dump(annotated_triples, open(annotated_triples_file, 'w'), indent=4)
 
         user_to_curr_annotating_triple_and_sources[username] = []

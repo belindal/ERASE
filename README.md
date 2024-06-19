@@ -57,61 +57,58 @@ python lm_eval.py \
 ### CLARK-News
 The CLARK-News dataset is available under `CLARK_news`.
 
-To run our data collection process, follow:
+If you want to collect more data, you may run our data collection process:
 
 1. Get Wikidata triples that change over time
 ```bash
-python script/get_wikidata_triples.py --data_dir <direction to store triples>
+python script/get_wikidata_triples.py --data_dir <output_dir>
 ```
+This saves the final triples to `<output_dir>/property_to_results.csv`.
 
-2. Annotate source documents, following:
-
-Get google searches:
+2. Get candidate sources for fact from Google
 ```bash
-python script/extract_queries.py
+python script/extract_queries.py \
+--source_csv <csv_of_wikidata_triples> \
+--target_csv <csv_with_candidate_sources>
 ```
+where `csv_of_wikidata_triples` is the filepath to the CSV file from step 1.
+This populates `csv_with_candidate_sources` with a list of candidate sources from Google.
 
-Launch annotations (launch annotation interface):
+3. Get human-validated annotations (launch annotation interface):
 ```bash
-python AnnotationInterface/webserver.py
+python AnnotationInterface/webserver.py \
+--source_file <csv_with_candidate_sources> \
+--target_file <csv_with_human_validated_sources> \
+--download_date <download_date>
 ```
+where `csv_with_candidate_sources` is the filepath to the CSV file from step 2.
+This populates `csv_with_human_validated_sources` with human annotations.
+`download_date` is the date that step 2 was run, in the YYYY-MM-DD. This is needed to infer the origin date of articles mined from Google.
 
-Cleanup and check annotations
-```bash
-# DO NOT RUN WHILE PEOPLE ARE ANNOTATING
-python AnnotationInterface/cleanup_unsubmitted.py   # un-allocate for users who have been allocated triples but haven't submitted
-```
-
-Pull sources from links:
+4. Pull text of sources from links:
 ```bash
 python script/pull_external_sources.py \
---edits_file AnnotationInterface/results/property_to_results_larger_subset_links_filtered.csv \
---output_dir wikipedia-data/subset
+--edits_file <csv_with_human_validated_sources> \
+--output_dir <output_dir_of_sources>
 ```
 
-Automated validation of annotations:
+5. Automated validation of round 1 annotations:
 ```bash
 # check problems
 python script/check_annotations.py  # display annotations in annotations.html
 ```
 
-Second round of annotation:
+6. Second round of human annotation to validate round 1 (launch checking interface):
 ```bash
 python CheckInterface/webserver.py
 ```
 
-Cleanup and check second round
-```bash
-python CheckInterface/cleanup_unsubmitted.py
-```
-
-3. Make questions from wikidata relations
+7. Make questions from wikidata relations
 
 ```bash
-python script/generate_wikidata_questions.py --wikidata_csv CheckInterface/results/property_to_results_larger_subset_links_filtered.csv --output_dir wikidata-data/subset
-python script/generate_wikidata_questions.py --wikidata_csv CheckInterface/results/property_to_results_larger_sports_subset_links_filtered.csv --output_dir wikidata-data/sports/
-python script/generate_wikidata_questions.py --wikidata_csv CheckInterface/results/property_to_results_larger_position_subset_links_filtered.csv --output_dir wikidata-data/position/
-python script/generate_wikidata_questions.py --wikidata_csv CheckInterface/results/property_to_results_smaller_sports_subset_links_filtered.csv --output_dir wikidata-data/sports_subset/
+python script/generate_wikidata_questions.py \
+--wikidata_csv CheckInterface/results/property_to_results_larger_subset_links_filtered.csv \
+--output_dir wikidata-data/subset
 ```
 
 
