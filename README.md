@@ -1,7 +1,9 @@
 # ERASE
-Code and Data for "Language Modeling with Editable External Knowledge"
+Code and Data for [Language Modeling with Editable External Knowledge](https://arxiv.org/html/2406.11830v1).
 
-### This repository is a work in progress.
+<!-- insert image -->
+![teaser](imgs/teaser.png)
+
 
 ## Setup
 To setup your environment, run:
@@ -18,6 +20,8 @@ bash setup.sh
 
 
 ## Run ERASE
+![ERASE overview](imgs/method.png)
+
 To run Mixtral, set your TogetherAI API token
 ```bash
 export TOGETHER_API_KEY=<TOGETHER_API_KEY>
@@ -31,14 +35,14 @@ export OPENAI_API_KEY=<OPENAI_API_KEY>
 To run ERASE on the CLARK-News dataset, use:
 ```bash
 python lm_eval.py \
---dataset news \
---datapath CLARK_news/ \
-(--model_name [mistralai/Mixtral-8x7B-Instruct-v0.1|meta-llama/Llama-3-8b-chat-hf]) \
-(--local_model_path <local_model_fp> \)
---context_length [2048|4096] \
---save_as_facts \
---retrieve_facts similarity \
-(--overwrite_facts similarity --edit_hops 1)
+    --dataset news \
+    --datapath CLARK_news/ \
+    (--model_name [mistralai/Mixtral-8x7B-Instruct-v0.1|meta-llama/Llama-3-8b-chat-hf]) \
+    (--local_model_path <local_model_fp> \)
+    --context_length [2048|4096] \
+    --save_as_facts \
+    --retrieve_facts similarity \
+    (--overwrite_facts similarity --edit_hops 1)
 ```
 
 * `--model_name` sets the model name for querying the TogetherAI API (for open-source models) or OpenAI API (for GPT* models). If this flag is set, queries the respective API for model inference. Otherwise, queries a local model.
@@ -52,7 +56,8 @@ python lm_eval.py \
 
 
 
-## Data
+## CLARK Data [WIP]
+![CLARK dataset](imgs/dataset.png)
 
 ### CLARK-News
 The CLARK-News dataset is available under `CLARK_news`.
@@ -68,8 +73,8 @@ This saves the final triples to `<output_dir>/property_to_results.csv`.
 2. Get candidate sources for fact from Google
 ```bash
 python script/extract_queries.py \
---source_csv <csv_of_wikidata_triples> \
---target_csv <csv_with_candidate_sources>
+    --source_csv <csv_of_wikidata_triples> \
+    --target_csv <csv_with_candidate_sources>
 ```
 where `csv_of_wikidata_triples` is the filepath to the CSV file from step 1.
 This populates `csv_with_candidate_sources` with a list of candidate sources from Google.
@@ -77,9 +82,9 @@ This populates `csv_with_candidate_sources` with a list of candidate sources fro
 3. Get human-validated annotations (launch annotation interface):
 ```bash
 python AnnotationInterface/webserver.py \
---source_file <csv_with_candidate_sources> \
---target_file <csv_with_human_validated_sources> \
---download_date <download_date>
+    --source_file <csv_with_candidate_sources> \
+    --target_file <csv_with_human_validated_sources> \
+    --download_date <download_date>
 ```
 where `csv_with_candidate_sources` is the filepath to the CSV file from step 2.
 This populates `csv_with_human_validated_sources` with human annotations.
@@ -88,13 +93,12 @@ This populates `csv_with_human_validated_sources` with human annotations.
 4. Pull text of sources from links:
 ```bash
 python script/pull_external_sources.py \
---edits_file <csv_with_human_validated_sources> \
---output_dir <output_dir_of_sources>
+    --edits_file <csv_with_human_validated_sources> \
+    --output_dir <output_dir_of_sources>
 ```
 
 5. Automated validation of round 1 annotations:
 ```bash
-# check problems
 python script/check_annotations.py  # display annotations in annotations.html
 ```
 
@@ -107,10 +111,22 @@ python CheckInterface/webserver.py
 
 ```bash
 python script/generate_wikidata_questions.py \
---wikidata_csv CheckInterface/results/property_to_results_larger_subset_links_filtered.csv \
---output_dir wikidata-data/subset
+    --wikidata_csv <csv_with_human_validated_sources> \
+    --output_dir <qs_output_dir>
 ```
 
 
 ### CLARK-Conversations
 Coming soon.
+
+## Cite
+To cite this work, you may use the following BibTex entry:
+```
+@misc{li2024language,
+      title={Language Modeling with Editable External Knowledge}, 
+      author={Belinda Z. Li and Emmy Liu and Alexis Ross and Abbas Zeitoun and Graham Neubig and Jacob Andreas},
+      year={2024},
+      eprint={2406.11830},
+      archivePrefix={arXiv},
+}
+```
